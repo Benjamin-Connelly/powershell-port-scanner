@@ -29,33 +29,33 @@ This PowerShell script provides a flexible and efficient TCP port scanning tool.
 
 1. Scan a single host:
 
-   ````
+   ````shell
    .\portscan.ps1 8.8.8.8
-   ```
+   ````
 
 2. Scan specific ports on a domain:
 
-   ````
+   ````shell
    .\portscan.ps1 example.com -p 80,443,22,3389
-   ```
+   ````
 
 3. Scan a range of ports and save results to a file:
 
-   ````
+   ````shell
    .\portscan.ps1 192.168.1.1 -p 1-1000 -O results.txt
-   ```
+   ````
 
 4. Scan all ports and save results in XML format:
 
-   ````
+   ````shell
    .\portscan.ps1 10.0.0.1 -p 1-65535 -O results.xml -Ox
-   ```
+   ````
 
 5. Scan a subnet and show only open ports:
 
-   ````
+   ````shell
    .\portscan.ps1 10.0.0.0/24 -p 80,443 --open
-   ```
+   ````
 
 ## Note
 

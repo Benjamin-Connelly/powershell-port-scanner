@@ -27,28 +27,30 @@ function Write-Log {
     }
 }
 
-Write-Log "Script started with parameters: Target=$Target, p=$p, O=$O, Ox=$Ox, ShowOpenOnly=$ShowOpenOnly"
+Write-Log "Script started with parameters: Target=$Target, p=$p, ShowOpenOnly=$ShowOpenOnly"
 
 try {
     function Show-Help {
         Write-Host @"
-Usage: .\ps2.ps1 <target> [options]
+Usage: .\portscan.ps1 <target> [options]
 
 Target:
   IP address, hostname, or subnet (e.g., 192.168.1.0/24)
 
 Options:
   -p <ports>    Specify ports to scan (e.g., 80,443,8080 or 1-1024)
-  -O <file>     Output results to a file
-  -Ox <file>    Output results in XML format
-  -Open         Only show open ports in the results
-  -v            Show verbose output
-  -h, --help    Show this help message
+  -oN <file>    Output results in normal text format
+  -oX <file>    Output results in XML format
+  -oG <file>   Output results in grepable (CSV) format
+  -oA <name>   Output in all formats
+  -Open        Only show open ports in the results
+  -v           Show verbose output
+  -h, --help   Show this help message
 
 Examples:
-  .\ps2.ps1 192.168.1.1 -p 80,443,8080
-  .\ps2.ps1 example.com -p 1-1024 -O results.txt
-  .\ps2.ps1 192.168.1.0/24 -p 22,80,443 -Open
+  .\portscan.ps1 192.168.1.1 -p 80,443,8080
+  .\portscan.ps1 example.com -p 1-1024 -oN results.txt
+  .\portscan.ps1 192.168.1.0/24 -p 22,80,443
 "@
         exit
     }
@@ -120,12 +122,12 @@ Examples:
         $Ports = 1..1024
         Write-Log "No ports specified, using default range 1-1024"
     } else {
-        $Ports = $p -join ','
+        $Ports = $p
         Write-Log "Ports specified: $Ports"
     }
 
     $parsedPorts = @()
-    foreach ($portRange in $Ports -split ',') {
+    foreach ($portRange in $Ports) {
         if ($portRange -match "^(\d+)-(\d+)$") {
             $start = [int]$Matches[1]
             $end = [int]$Matches[2]

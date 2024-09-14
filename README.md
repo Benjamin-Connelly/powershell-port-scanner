@@ -12,20 +12,21 @@ This PowerShell script provides a flexible and efficient TCP port scanning tool.
 
 ## Usage
 
-`.\ps2.ps1 <TargetHost|Subnet> [-p <ports>] [-oN <file>] [-oX <file>] [-oG <file>] [-oA <basename>] [-Open|--open]`
+`.\ps2.ps1 <TargetHost|Subnet> [-p <ports>] [-oN <file>] [-oX <file>] [-oG <file>] [-oA <basename>] [-Open] [-v]`
 
 ### Parameters
 
-- `TargetHost|Subnet`: The IP address, hostname, or subnet (CIDR notation) to scan (required)
+- `TargetHost|cidr`: The IP address, hostname, or subnet (CIDR notation) to scan (required)
 - `-p <ports>`: Ports to scan. Can be individual ports, ranges, or a mix.
   - Examples: `-p 80,443,8080` or `-p 80-100,443,1000-2000`
   - If omitted, scans ports 1-1024.
 - `-oN <file>`: Save results in normal text format
 - `-oX <file>`: Save results in XML format
 - `-oG <file>`: Save results in grepable (CSV) format
-- `-oA <basename>`: Save results in all major formats (normal, XML, and CSV)
-- `-Open, --open`: Display only open ports in the output
-- `-h`: Display the help message
+- `-oA <name>`: Save results in all major formats (normal, XML, and CSV)
+- `-Open`     : Display only open ports in the output
+- `-v`: Show verbose output
+- `-h, --help`: Display the help message
 
 ## Examples
 
@@ -53,10 +54,10 @@ This PowerShell script provides a flexible and efficient TCP port scanning tool.
    .\ps2.ps1 10.0.0.1 -p 1-65535 -oX results.xml
    ```
 
-5. Scan a subnet, show only open ports, and save results in all formats:
+5. Scan a subnet and show only open ports:
 
    ```shell
-   .\ps2.ps1 10.0.0.0/24 -p 80,443 --open -oA scan_results
+   .\portscan.ps1 10.0.0.0/24 -p 80,443 -Open
    ```
 
 ## Note

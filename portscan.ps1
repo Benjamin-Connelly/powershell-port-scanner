@@ -5,8 +5,10 @@ param (
     [Parameter(Position=1)]
     [string[]]$p,
 
-    [string]$O,
-    [switch]$Ox,
+    [string]$oN,
+    [string]$oX,
+    [string]$oG,
+    [string]$oA,
     [Alias("Open")]
     [switch]$ShowOpenOnly,
     [Alias("v")]
@@ -202,16 +204,28 @@ Examples:
     }
 
     $formattedResults = $results | Format-Table -AutoSize | Out-String
+    $csvResults = $results | ConvertTo-Csv -NoTypeInformation
 
-    if ($O) {
-        if ($Ox) {
-            $results | Export-Clixml -Path $O
-            Write-Log "Results saved in XML format to $O"
-        } else {
-            $formattedResults | Out-File -FilePath $O
-            Write-Log "Results saved to $O"
-        }
-    } else {
+    if ($oN) {
+        $formattedResults | Out-File -FilePath $oN
+        Write-Log "Results saved in normal format to $oN"
+    }
+    if ($oX) {
+        $results | Export-Clixml -Path $oX
+        Write-Log "Results saved in XML format to $oX"
+    }
+    if ($oG) {
+        $csvResults | Out-File -FilePath $oG
+        Write-Log "Results saved in grepable (CSV) format to $oG"
+    }
+    if ($oA) {
+        $baseName = $oA
+        $formattedResults | Out-File -FilePath "$baseName.txt"
+        $results | Export-Clixml -Path "$baseName.xml"
+        $csvResults | Out-File -FilePath "$baseName.csv"
+        Write-Log "Results saved in all formats to $baseName.txt, $baseName.xml, and $baseName.csv"
+    }
+    if (-not ($oN -or $oX -or $oG -or $oA)) {
         Write-Host "`nScan Results:"
         Write-Host $formattedResults
     }

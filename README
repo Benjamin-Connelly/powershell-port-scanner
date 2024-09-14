@@ -1,0 +1,176 @@
+param()
+
+function Show-Help {
+    $helpText = @"
+PowerShell TCP Port Scanner
+
+Usage: .\portscan.ps1 <TargetHost|Subnet> [-p <ports>] [-O <output_file>] [-Ox] [-Open|--open]
+
+Parameters:
+  TargetHost|Subnet : The IP address, hostname, or subnet (CIDR notation) to scan (required)
+  -p <ports>        : Ports to scan. Can be individual ports, ranges, or a mix.
+                      Examples: -p 80,443,8080 or -p 80-100,443,1000-2000
+                      If omitted, scans ports 1-1024.
+  -O <file>         : Save results to a file
+  -Ox               : Save results in XML format (use with -O)
+  -Open, --open     : Display only open ports in the output
+  -h                : Display this help message
+
+Examples:
+  .\portscan.ps1 8.8.8.8
+  .\portscan.ps1 example.com -p 80,443,22,3389
+  .\portscan.ps1 192.168.1.1 -p 1-1000 -O results.txt
+  .\portscan.ps1 10.0.0.1 -p 1-65535 -O results.xml -Ox
+  .\portscan.ps1 192.168.1.1 -p 1-1000 -Open
+  .\portscan.ps1 10.0.0.0/24 -p 80,443 --open
+
+Note: This script fetches well-known port information from GitHub.
+"@
+    Write-Host $helpText
+    exit
+}
+
+# Function to generate IP addresses from subnet
+function Get-IPRange {
+    param (
+        [string]$Subnet
+    )
+
+    $ip, $cidr = $Subnet -split '/'
+    $ipBytes = [System.Net.IPAddress]::Parse($ip).GetAddressBytes()
+    [Array]::Reverse($ipBytes)
+    $ipInt = [System.BitConverter]::ToUInt32($ipBytes, 0)
+
+    $mask = ([UInt32]::MaxValue) -shl (32 - $cidr) -shr (32 - $cidr)
+    $netStart = $ipInt -band $mask
+    $netEnd = $netStart + ($mask -bxor [UInt32]::MaxValue)
+
+    for ($i = $netStart; $i -le $netEnd; $i++) {
+        $ipBytes = [System.BitConverter]::GetBytes($i)
+        [Array]::Reverse($ipBytes)
+        [System.Net.IPAddress]::new($ipBytes)
+    }
+}
+
+# Manual argument parsing
+$Target = $null
+$Ports = $null
+$OutputFile = $null
+$Xml = $false
+$Open = $false
+
+for ($i = 0; $i -lt $args.Count; $i++) {
+    switch ($args[$i]) {
+        { $_ -in "-h", "--help" } { Show-Help }
+        "-p" { $Ports = $args[++$i] }
+        "-O" { $OutputFile = $args[++$i] }
+        "-Ox" { $Xml = $true }
+        { $_ -in "-Open", "--open" } { $Open = $true }
+        default {
+            if (-not $Target) {
+                $Target = $args[$i]
+            }
+        }
+    }
+}
+
+if (-not $Target) {
+    Write-Host "Error: Target host or subnet is required."
+    Show-Help
+}
+
+function Get-WellKnownPorts {
+    # ... [Keep the existing Get-WellKnownPorts function] ...
+}
+
+$wellKnownPorts = Get-WellKnownPorts
+
+if (-not $Ports) {
+    $Ports = 1..1024  # Default to scanning first 1024 ports if not specified
+}
+
+$parsedPorts = @()
+foreach ($port in $Ports -split ',') {
+    if ($port -match "^(\d+)-(\d+)$") {
+        $start = [int]$Matches[1]
+        $end = [int]$Matches[2]
+        $parsedPorts += $start..$end
+    } elseif ($port -match "^\d+$") {
+        $parsedPorts += [int]$port
+    }
+}
+$parsedPorts = $parsedPorts | Select-Object -Unique | Sort-Object
+
+$results = @()
+
+# Check if target is a subnet
+if ($Target -match '/') {
+    $targetHosts = Get-IPRange -Subnet $Target
+} else {
+    $targetHosts = @($Target)
+}
+
+foreach ($host in $targetHosts) {
+    Write-Host "Starting scan of $host..."
+
+    try {
+        $ipAddress = [System.Net.Dns]::GetHostAddresses($host) |
+                     Where-Object { $_.AddressFamily -eq 'InterNetwork' } |
+                     Select-Object -First 1 -ExpandProperty IPAddressToString
+
+        if ($ipAddress -ne $host) {
+            Write-Host "Resolved $host to $ipAddress"
+        }
+    } catch {
+        Write-Host "Unable to resolve hostname. Using $host as entered."
+        $ipAddress = $host
+    }
+
+    foreach ($port in $parsedPorts) {
+        $tcpClient = New-Object System.Net.Sockets.TcpClient
+        try {
+            $connectResult = $tcpClient.BeginConnect($ipAddress, $port, $null, $null)
+            $waitResult = $connectResult.AsyncWaitHandle.WaitOne(1000, $false)
+            if ($waitResult) {
+                $tcpClient.EndConnect($connectResult)
+                $status = "Open"
+            } else {
+                $status = "Closed/Filtered"
+            }
+        } catch {
+            $status = "Closed"
+        } finally {
+            $tcpClient.Close()
+        }
+
+        $service = if ($wellKnownPorts.ContainsKey($port)) { $wellKnownPorts[$port] } else { "Unknown" }
+
+        $results += [PSCustomObject]@{
+            Host = $ipAddress
+            Port = $port
+            Status = $status
+            Service = $service
+        }
+
+        Write-Host "Host: $ipAddress, Port $port ($service) is $status"
+    }
+}
+
+if ($Open) {
+    $results = $results | Where-Object { $_.Status -eq "Open" }
+}
+
+$formattedResults = $results | Format-Table -AutoSize | Out-String
+
+if ($OutputFile) {
+    if ($Xml) {
+        $results | Export-Clixml -Path $OutputFile
+        Write-Host "Results saved in XML format to $OutputFile"
+    } else {
+        $formattedResults | Out-File -FilePath $OutputFile
+        Write-Host "Results saved to $OutputFile"
+    }
+} else {
+    Write-Host "`nScan Results:"
+    Write-Host $formattedResults
+}

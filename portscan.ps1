@@ -38,7 +38,7 @@ Target:
 Options:
   -p <ports>    Specify ports to scan (e.g., 80,443,8080 or 1-1024)
   -O <file>     Output results to a file
-  -Ox           Output results in XML format
+  -Ox <file>    Output results in XML format
   -Open         Only show open ports in the results
   -v            Show verbose output
   -h, --help    Show this help message

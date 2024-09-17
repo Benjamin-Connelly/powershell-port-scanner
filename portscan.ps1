@@ -32,7 +32,7 @@ Write-Log "Script started with parameters: Target=$Target, p=$p, O=$O, Ox=$Ox, S
 try {
     function Show-Help {
         Write-Host @"
-Usage: .\ps2.ps1 <target> [options]
+Usage: .\portscan.ps1 <target> [options]
 
 Target:
   IP address, hostname, or subnet (e.g., 192.168.1.0/24)
@@ -46,9 +46,9 @@ Options:
   -h, --help    Show this help message
 
 Examples:
-  .\ps2.ps1 192.168.1.1 -p 80,443,8080
-  .\ps2.ps1 example.com -p 1-1024 -O results.txt
-  .\ps2.ps1 192.168.1.0/24 -p 22,80,443 -Open
+  .\portscan.ps1 192.168.1.1 -p 80,443,8080
+  .\portscan.ps1 example.com -p 1-1024 -O results.txt
+  .\portscan.ps1 192.168.1.0/24 -p 22,80,443 -Open
 "@
         exit
     }

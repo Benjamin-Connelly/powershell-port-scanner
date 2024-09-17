@@ -18,8 +18,6 @@ This PowerShell script provides a flexible and efficient TCP port scanning tool.
 
 - `TargetHost|cidr`: The IP address, hostname, or subnet (CIDR notation) to scan (required)
 - `-p <ports>`: Ports to scan. Can be individual ports, ranges, or a mix.
-  - Examples: `-p 80,443,8080` or `-p 80-100,443,1000-2000`
-  - If omitted, scans ports 1-1024.
 - `-oN <file>`: Save results in normal text format
 - `-oX <file>`: Save results in XML format
 - `-oG <file>`: Save results in grepable (CSV) format
@@ -39,7 +37,7 @@ This PowerShell script provides a flexible and efficient TCP port scanning tool.
 2. Scan specific ports on a domain:
 
    ```shell
-   .\ps2.ps1 example.com -p 80,443,22,3389
+   .\ps2.ps1 example.com -p 80,443,22,3389,0-22
    ```
 
 3. Scan a range of ports and save results to a normal text file:

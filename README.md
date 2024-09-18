@@ -16,7 +16,7 @@ This PowerShell script provides a flexible and efficient TCP port scanning tool.
 ## Usage
 
 ```powershell
-.\portscan.ps1 <IPAddress> [-p <ports>] [-Common] [-Open]
+.\portscan.ps1 <IPAddress> [-sp] [-Pn] [-p <ports>] [-Common] [-Open]
 ```
 
 

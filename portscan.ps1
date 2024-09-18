@@ -10,7 +10,7 @@ param (
     [switch]$Open,
     [int]$Timeout = 2000,
     [int]$Threads = 100,
-    [switch]$PingBeforeScan
+    [switch]$Pn
 )
 
 function Expand-IPRange {
@@ -123,8 +123,8 @@ Write-Host "Scan in progress..."
 $results = @()
 
 foreach ($ip in $ipRange) {
-    $hostAlive = $true
-    if ($PingBeforeScan) {
+    $hostAlive = !$Pn
+    if (!$Pn) {
         $hostAlive = Test-HostAlive -ip $ip.ToString()
         if ($hostAlive) {
             Write-Verbose "Host $ip is responding to ping"
@@ -133,7 +133,7 @@ foreach ($ip in $ipRange) {
         }
     }
 
-    if ($hostAlive) {
+    if ($hostAlive -or $Pn) {
         $openPorts = @()
         foreach ($port in $portsToScan) {
             $status = Scan-Port -ip $ip.ToString() -port $port

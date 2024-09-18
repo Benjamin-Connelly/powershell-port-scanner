@@ -1,70 +1,61 @@
 # PowerShell TCP Port Scanner
 
-This PowerShell script provides a flexible and efficient TCP port scanning tool. It allows you to scan individual hosts, subnets, and perform scans across multiple ports or port ranges.
+This PowerShell script provides a flexible and efficient TCP port scanning tool. It allows you to scan individual hosts across multiple ports or port ranges.
 
 ## Features
 
-- Scan individual hosts or entire subnets (CIDR notation supported)
+- Scan individual hosts
 - Specify individual ports or port ranges to scan
-- Save results to a file (plain text, XML, or CSV format)
+- Option to scan common ports or top 20 ports
 - Option to display only open ports
-- Fetches well-known port information for better context
-- Supports common ports scanning
+- Efficient asynchronous port scanning
 
 ## Usage
 
-`.\ps2.ps1 <TargetHost|Subnet> [-p <ports>] [-oN <file>] [-oX <file>] [-oG <file>] [-oA <basename>] [-Open|--open]`
+```powershell
+.\portscan.ps1 <IPAddress> [-p <ports>] [-Common] [-Open]
+```
+
 
 ### Parameters
 
-- `TargetHost|cidr`: The IP address, hostname, or subnet (CIDR notation) to scan (required)
+- `IPAddress`: The IP address or hostname to scan (required)
 - `-p <ports>`: Ports to scan. Can be individual ports, ranges, or a mix.
   - Examples: `-p 80,443,8080` or `-p 80-100,443,1000-2000`
-  - If omitted, scans ports 1-1024.
-- `-oN <file>`: Save results in normal text format
-- `-oX <file>`: Save results in XML format
-- `-oG <file>`: Save results in grepable (CSV) format
-- `-oA <basename>`: Save results in all major formats (normal, XML, and CSV)
-- `-Open, --open`: Display only open ports in the output
-- `-h`: Display the help message
+  - If omitted, scans top 20 common ports by default.
+- `-Common`: Scan a larger set of common ports instead of just the top 20
+- `-Open`: Display only open ports in the output
 
 ## Examples
 
-1. Scan a single host:
+1. Scan a single host using default top 20 ports:
 
    ```powershell
-   .\portscan.ps1 8.8.8.8
+   .\portscan.ps1 192.168.1.1
    ```
 
-2. Scan specific ports on a domain:
-
-   ```shell
-   .\ps2.ps1 example.com -p 80,443,22,3389
-   ```
-
-3. Scan a range of ports and save results to a normal text file:
+2. Scan specific ports on a host:
 
    ```powershell
-   .\portscan.ps1 192.168.1.1 -p 1-1000 -oN results.txt
+   .\portscan.ps1 example.com -p 80,443,22,3389
    ```
 
-4. Scan all ports and save results in XML format:
+3. Scan a range of ports:
 
    ```powershell
-   .\portscan.ps1 10.0.0.1 -p 1-65535 -oX results.xml
+   .\portscan.ps1 10.0.0.1 -p 1-1000
    ```
 
-5. Scan a subnet and show only open ports:
+4. Scan common ports and show only open ports:
 
-   ```shell
-   .\ps2.ps1 10.0.0.0/24 -p 80,443 --open -oA scan_results
+   ```powershell
+   .\portscan.ps1 192.168.0.1 -Common -Open
    ```
 
 ## Note
 
-This script fetches well-known port information from GitHub to provide additional context for the scanned ports.
+This script uses asynchronous scanning for improved performance. The timeout for each port scan is set to 500 milliseconds.
 
 ## Requirements
 
 - PowerShell 5.1 or later
-- Internet connection (for fetching well-known port information)

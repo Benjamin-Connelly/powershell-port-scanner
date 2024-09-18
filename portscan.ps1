@@ -10,7 +10,8 @@ param (
     [switch]$Open,
     [int]$Timeout = 2000,
     [int]$Threads = 100,
-    [switch]$Pn
+    [switch]$Pn,
+    [switch]$sp
 )
 
 function Expand-IPRange {
@@ -115,6 +116,29 @@ foreach ($port in $portsToScan) {
 $portsToScan = $expandedPorts | Sort-Object -Unique
 
 $ipRange = Expand-IPRange $ipAddressWithCIDR
+
+if ($sp) {
+    Write-Host "Performing ping scan on IP range: $ipAddressWithCIDR"
+    $pingResults = @()
+    foreach ($ip in $ipRange) {
+        $isAlive = Test-HostAlive -ip $ip.ToString()
+        $pingResults += [PSCustomObject]@{
+            IPAddress = $ip
+            IsAlive = $isAlive
+        }
+        if ($isAlive) {
+            Write-Host "Host $ip is up"
+        } else {
+            Write-Host "Host $ip is down"
+        }
+    }
+    $aliveHosts = ($pingResults | Where-Object { $_.IsAlive }).Count
+    Write-Host "`nPing Scan Results:"
+    Write-Host "Total hosts up: $aliveHosts"
+    Write-Host "Total hosts in range: $($pingResults.Count)"
+    Write-Host "Script completed successfully"
+    return
+}
 
 Write-Host "Scanning IP range: $ipAddressWithCIDR"
 Write-Host "Ports being scanned: $($portsToScan -join ', ')"

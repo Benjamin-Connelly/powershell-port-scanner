@@ -1,125 +1,187 @@
 # portscan.ps1
+
 param (
     [Parameter(Mandatory=$true, Position=0)]
-    [string]$ipAddress,
+    [string]$ipAddressWithCIDR,
     [switch]$Common,
-    [string]$p,
     [Parameter(Mandatory=$false)]
-    [switch]$Open
+    [string[]]$p,
+    [Parameter(Mandatory=$false)]
+    [switch]$Open,
+    [int]$Timeout = 2000,
+    [int]$Threads = 100,
+    [switch]$PingBeforeScan
 )
 
-# Define the Scan-Port function at the beginning of the script
+function Expand-IPRange {
+    param ([string]$ipAddressWithCIDR)
+
+    if ($ipAddressWithCIDR -notmatch '/') {
+        # Single IP address
+        return @([System.Net.IPAddress]::Parse($ipAddressWithCIDR))
+    }
+
+    $ipAddress, $cidrPrefix = $ipAddressWithCIDR.Split('/')
+    $ip = [System.Net.IPAddress]::Parse($ipAddress)
+    $cidr = [int]$cidrPrefix
+
+    if ($cidr -eq 32) {
+        # /32 CIDR, return single IP
+        return @($ip)
+    }
+
+    $ipBytes = $ip.GetAddressBytes()
+    [Array]::Reverse($ipBytes)
+    $ipInt = [System.BitConverter]::ToUInt32($ipBytes, 0)
+
+    $maskInt = ([UInt32]::MaxValue) -shl (32 - $cidr)
+    $networkInt = $ipInt -band $maskInt
+    $broadcastInt = $networkInt -bor (-bnot $maskInt)
+
+    $networkIP = [System.Net.IPAddress]([UInt32]$networkInt)
+    $broadcastIP = [System.Net.IPAddress]([UInt32]$broadcastInt)
+
+    Write-Verbose "Network ID: $networkIP"
+    Write-Verbose "Broadcast IP: $broadcastIP"
+
+    $ipRange = @()
+    for ($i = $networkInt; $i -le $broadcastInt; $i++) {
+        $currentIPBytes = [System.BitConverter]::GetBytes([UInt32]$i)
+        [Array]::Reverse($currentIPBytes)
+        $ipRange += [System.Net.IPAddress]::new($currentIPBytes)
+    }
+
+    Write-Verbose "IP Range contains $($ipRange.Count) addresses"
+    return $ipRange
+}
+
+function Test-HostAlive {
+    param([string]$ip)
+    $ping = New-Object System.Net.NetworkInformation.Ping
+    try {
+        $result = $ping.Send($ip, 1000)
+        return $result.Status -eq 'Success'
+    } catch {
+        Write-Verbose "Ping failed for $ip : $_"
+        return $false
+    }
+}
+
 function Scan-Port {
     param([string]$ip, [int]$port)
+    $tcpClient = New-Object System.Net.Sockets.TcpClient
     try {
-        $tcpclient = New-Object System.Net.Sockets.TcpClient
-        $asyncResult = $tcpclient.BeginConnect($ip, $port, $null, $null)
-        $wait = $asyncResult.AsyncWaitHandle.WaitOne(500, $false)
-        if ($wait) {
-            try {
-                $tcpclient.EndConnect($asyncResult)
-                return "Open"
-            } catch {
-                return "Closed"
-            }
+        Write-Verbose "Scanning $ip : $port"
+        $result = $tcpClient.BeginConnect($ip, $port, $null, $null)
+        $success = $result.AsyncWaitHandle.WaitOne($Timeout, $false)
+        if ($success) {
+            $tcpClient.EndConnect($result)
+            Write-Verbose "Port $port on $ip is open"
+            return "Open"
         } else {
+            Write-Verbose "Port $port on $ip is closed or filtered"
             return "Closed"
         }
     } catch {
-        Write-Log "Error scanning port $port on ${ip}: $($_.Exception.Message)"
-        return "Error"
+        Write-Verbose "Error scanning port $port on $ip : $_"
+        return "Closed"
     } finally {
-        if ($null -ne $tcpclient) {
-            $tcpclient.Close()
-        }
+        $tcpClient.Close()
     }
 }
 
-function Write-Log {
-    param(
-        [string]$Message
-    )
-    Write-Host $Message
+if ($p) {
+    $portsToScan = $p
+} elseif ($Common) {
+    $portsToScan = @("7", "9", "13", "21-23", "25-26", "37", "53", "79-81", "88", "106", "110-111", "113", "119", "135", "139", "143-144", "179", "199", "389", "427", "443-445", "465", "513-515", "543-544", "548", "554", "587", "631", "646", "873", "990", "993", "995", "1025-1029", "1110", "1433", "1720", "1723", "1755", "1900", "2000-2001", "2049", "2121", "2717", "3000", "3128", "3306", "3389", "3986", "4899", "5000", "5009", "5051", "5060", "5101", "5190", "5357", "5432", "5631", "5666", "5800", "5900", "6000-6001", "6646", "7070", "8000", "8008-8009", "8080-8081", "8443", "8888", "9100", "9999-10000", "32768", "49152-49157")
+} else {
+    # Default ports if neither -p nor -Common is specified
+    $portsToScan = @("80", "443", "22", "21", "25", "3389", "110", "143", "53",
+                     "23", "445", "3306", "8080", "1433", "3389", "5900",
+                     "135", "139", "8443", "1723")
 }
 
-function Expand-PortRange {
-    param([string]$portRange)
-    $ports = @()
-    $ranges = $portRange -split '[,\s]' | Where-Object { $_ -ne '' }
-    foreach ($range in $ranges) {
-        $range = $range.Trim()
-        if ($range -match '^(\d+)-(\d+)$') {
-            $start = [int]$Matches[1]
-            $end = [int]$Matches[2]
-            $ports += $start..$end
-        }
-        elseif ($range -match '^\d+$') {
-            $ports += [int]$range
-        }
-        else {
-            Write-Log "Invalid port range format: $range"
-        }
-    }
-    return $ports
-}
-
-function Get-WellKnownPorts {
-    param([switch]$Common)
-
-    $commonPorts = "7,9,13,21-23,25-26,37,53,79-81,88,106,110-111,113,119,135,139,143-144,179,199,389,427,443-445,465,513-515,543-544,548,554,587,631,646,873,990,993,995,1025-1029,1110,1433,1720,1723,1755,1900,2000-2001,2049,2121,2717,3000,3128,3306,3389,3986,4899,5000,5009,5051,5060,5101,5190,5357,5432,5631,5666,5800,5900,6000-6001,6646,7070,8000,8008-8009,8080-8081,8443,8888,9100,9999-10000,32768,49152-49157"
-    $top20Ports = "80,443,21,22,25,53,110,119,123,143,161,194,443,445,587,993,995,3306,3389,5900"
-
-    if ($Common) {
-        Write-Log "Using common TCP ports"
-        return Expand-PortRange -portRange $commonPorts
+# Expand port ranges
+$expandedPorts = @()
+foreach ($port in $portsToScan) {
+    if ($port -match '^(\d+)-(\d+)$') {
+        $start = [int]$Matches[1]
+        $end = [int]$Matches[2]
+        $expandedPorts += $start..$end
     } else {
-        Write-Log "Using top 20 common TCP ports"
-        return Expand-PortRange -portRange $top20Ports
+        $expandedPorts += [int]$port
     }
 }
+$portsToScan = $expandedPorts | Sort-Object -Unique
 
-try {
-    if (-not $ipAddress) {
-        throw "IP address not provided. Usage: .\portscan.ps1 <IP_ADDRESS> [-p <PORTS>] [-Common]"
-    }
+$ipRange = Expand-IPRange $ipAddressWithCIDR
 
-    # Initialize the port variable based on input parameters
-    if ($p) {
-        $portsToScan = Expand-PortRange -portRange $p
-        Write-Log "Using user-specified ports: $($portsToScan -join ', ')"
-    } elseif ($Common) {
-        $portsToScan = Get-WellKnownPorts -Common
-        Write-Log "Using common TCP ports"
-    } else {
-        $portsToScan = Get-WellKnownPorts
-        Write-Log "Using top 20 common TCP ports"
-    }
+Write-Host "Scanning IP range: $ipAddressWithCIDR"
+Write-Host "Ports being scanned: $($portsToScan -join ', ')"
+Write-Host "Scan in progress..."
 
-    $results = @()
+$results = @()
 
-    foreach ($port in $portsToScan) {
-        $status = Scan-Port -ip $ipAddress -port $port
-        $results += [PSCustomObject]@{IPAddress = $ipAddress; Port = $port; Status = $status}
-        if (-not $Open -or $status -eq "Open") {
-            Write-Log "Host: $ipAddress, Port $port is $status"
+foreach ($ip in $ipRange) {
+    $hostAlive = $true
+    if ($PingBeforeScan) {
+        $hostAlive = Test-HostAlive -ip $ip.ToString()
+        if ($hostAlive) {
+            Write-Verbose "Host $ip is responding to ping"
+        } else {
+            Write-Verbose "Host $ip is not responding to ping"
         }
     }
 
-    if ($Open) {
-        $results = $results | Where-Object { $_.Status -eq "Open" }
+    if ($hostAlive) {
+        $openPorts = @()
+        foreach ($port in $portsToScan) {
+            $status = Scan-Port -ip $ip.ToString() -port $port
+            if ($status -eq "Open") {
+                $openPorts += $port
+                Write-Host "Host: $ip, Port $port is Open"
+            }
+        }
+        $results += [PSCustomObject]@{
+            IPAddress = $ip
+            OpenPorts = $openPorts
+            Scanned = $true
+        }
+    } else {
+        $results += [PSCustomObject]@{
+            IPAddress = $ip
+            OpenPorts = @()
+            Scanned = $false
+        }
     }
-
-    Write-Log "Total results: $($results.Count)"
-
-    $formattedResults = $results | Format-Table -AutoSize | Out-String
-
-    Write-Host "`nScan Results:"
-    Write-Host $formattedResults
-
-    Write-Log "Script completed successfully"
-} catch {
-    Write-Log "An error occurred: $_"
-    Write-Log "Stack trace: $($_.ScriptStackTrace)"
-    Write-Host "An error occurred. Please check the log file for details."
-    exit 1
 }
+
+Write-Host "`nScan Results:"
+if ($Open) {
+    $openResults = $results | Where-Object { $_.OpenPorts.Count -gt 0 }
+    if ($openResults.Count -eq 0) {
+        Write-Host "No open ports found in the specified range."
+    } else {
+        $openResults | ForEach-Object {
+            Write-Host "IP: $($_.IPAddress), Open Ports: $($_.OpenPorts -join ', ')"
+        }
+    }
+    Write-Host "Total hosts with open ports: $($openResults.Count)"
+} else {
+    $results | ForEach-Object {
+        if ($_.Scanned) {
+            if ($_.OpenPorts.Count -eq 0) {
+                Write-Host "IP: $($_.IPAddress), No open ports"
+            } else {
+                Write-Host "IP: $($_.IPAddress), Open Ports: $($_.OpenPorts -join ', ')"
+            }
+        } else {
+            Write-Host "IP: $($_.IPAddress), Not scanned (did not respond to ping)"
+        }
+    }
+}
+
+$scannedHosts = ($results | Where-Object { $_.Scanned }).Count
+Write-Host "Total hosts scanned: $scannedHosts"
+Write-Host "Total hosts in range: $($results.Count)"
+Write-Host "Script completed successfully"

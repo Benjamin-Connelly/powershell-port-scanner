@@ -1,24 +1,23 @@
 # PowerShell TCP Port Scanner
 
-This PowerShell script provides a flexible and efficient TCP port scanning tool. It allows you to scan individual hosts or subnets across multiple ports or port ranges, with options for ping checks and ping-only scans.
+This PowerShell script provides a portable and efficient TCP port scanning tool. It allows you to scan individual hosts or subnets across multiple ports or port ranges, with options to perform a sign of life ping before scanning, or to run a ping-only scan.
 
 ## Features
 
 - Scan individual hosts or subnets (CIDR notation supported)
 - Specify individual ports or port ranges to scan
-- Option to scan common ports or top 20 ports
-- Option to display only open ports
-- Ping check before port scanning (default behavior)
-- Option to skip ping check and scan all hosts
+- Option to scan commonly used ports or the top 20 most commonly used ports
+- Option to display only open ports (hide closed ports)
+- Ping check before port scanning (sign of life ping) by default
+- Option to skip sign of life ping and scan for open ports only
 - Ping-only scan option to quickly check for live hosts
 - Efficient asynchronous port scanning
 
 ## Usage
 
 ```powershell
-.\portscan.ps1 <IPAddress> [-sp] [-Pn] [-p <ports>] [-Common] [-Open]
+.\portscan.ps1 <IPAddress> [-sp] [-Pn] [-p <ports>] [-Common] [-Open] [-Verbose]
 ```
-
 
 ### Parameters
 
@@ -30,6 +29,7 @@ This PowerShell script provides a flexible and efficient TCP port scanning tool.
 - `-sp`: Perform a ping scan on the IP range
 - `-Pn`: Skip the ping check and scan all hosts
 - `-Open`: Display only open ports in the output
+- `-Verbose`: Display detailed information about the scan process
 
 ## Examples
 

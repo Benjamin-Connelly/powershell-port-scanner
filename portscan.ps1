@@ -14,6 +14,20 @@ param (
     [switch]$sp
 )
 
+# Import CSV file with port descriptions
+$portDescriptions = Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Benjamin-Connelly/ports-list/main/tcp.csv" | ConvertFrom-Csv
+
+# Function to get service name for a port
+function Get-ServiceName {
+    param([int]$port)
+    $service = $portDescriptions | Where-Object { $_.port -eq $port -and $_.protocol -eq "TCP" } | Select-Object -First 1
+    if ($service) {
+        return $service.description
+    } else {
+        return "unknown"
+    }
+}
+
 function Expand-IPRange {
     param ([string]$ipAddressWithCIDR)
 
@@ -187,25 +201,33 @@ if ($Open) {
         Write-Host "No open ports found in the specified range."
     } else {
         $openResults | ForEach-Object {
-            Write-Host "IP: $($_.IPAddress), Open Ports: $($_.OpenPorts -join ', ')"
+            Write-Host "`nIP: $($_.IPAddress)"
+            Write-Host "PORT   STATE   SERVICE"
+            $_.OpenPorts | ForEach-Object {
+                $serviceName = Get-ServiceName $_
+                Write-Host ("{0,-6} {1,-7} {2}" -f $_, "open", $serviceName)
+            }
         }
     }
-    Write-Host "Total hosts with open ports: $($openResults.Count)"
+    Write-Host "`nTotal hosts with open ports: $($openResults.Count)"
 } else {
     $results | ForEach-Object {
         if ($_.Scanned) {
-            if ($_.OpenPorts.Count -eq 0) {
-                Write-Host "IP: $($_.IPAddress), No open ports"
-            } else {
-                Write-Host "IP: $($_.IPAddress), Open Ports: $($_.OpenPorts -join ', ')"
+            Write-Host "`nIP: $($_.IPAddress)"
+            Write-Host "PORT   STATE   SERVICE"
+            $portsToScan | ForEach-Object {
+                $port = $_
+                $state = if ($_.OpenPorts -contains $port) { "open" } else { "closed" }
+                $serviceName = Get-ServiceName $port
+                Write-Host ("{0,-6} {1,-7} {2}" -f $port, $state, $serviceName)
             }
         } else {
-            Write-Host "IP: $($_.IPAddress), Not scanned (did not respond to ping)"
+            Write-Host "`nIP: $($_.IPAddress), Not scanned (did not respond to ping)"
         }
     }
 }
 
 $scannedHosts = ($results | Where-Object { $_.Scanned }).Count
-Write-Host "Total hosts scanned: $scannedHosts"
+Write-Host "`nTotal hosts scanned: $scannedHosts"
 Write-Host "Total hosts in range: $($results.Count)"
 Write-Host "Script completed successfully"
